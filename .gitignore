@@ -1,0 +1,35 @@
+node_modules
+dist
+
+*.log
+.DS_Store
+.envrc
+
+/.pnpm-store/
+/assets/
+
+# drone CI is in .drone.star, do not let someone accidentally commit a local .drone.yml
+.drone.yml
+
+.env
+.idea
+.vscode
+
+# dev setup
+docker-compose.override.yml
+dev/docker/opencloud/files
+
+# Certificate files (never commit these!)
+*.crt
+*.key
+*.pem
+*.p12
+*.pfx
+*.cer
+*.der
+*.csr
+*.jks
+*.keystore
+*.truststore
+**/certificates/
+**/certs/

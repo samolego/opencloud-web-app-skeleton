@@ -1,0 +1,98 @@
+services:
+  traefik:
+    image: traefik:v3.3.1
+    networks:
+      opencloud-net:
+        aliases:
+          - cloud.opencloud.test
+    entrypoint:
+      - '/bin/sh'
+      - '-c'
+      - |
+        mkdir -p /certs
+        if [ ! -f /certs/server.key ] || [ ! -f /certs/server.crt ]; then
+          echo "Generating self-signed certificates..."
+          apk add --no-cache openssl
+          openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+            -keyout /certs/server.key \
+            -out /certs/server.crt \
+            -subj "/C=US/ST=Development/L=Development/O=OpenCloud/OU=Development/CN=cloud.opencloud.test" \
+            -addext "subjectAltName=DNS:cloud.opencloud.test,DNS:localhost,DNS:*.opencloud.test,IP:127.0.0.1"
+          chmod 600 /certs/server.key
+          chmod 644 /certs/server.crt
+          echo "Certificates generated and saved to dev/docker/traefik/certificates"
+        else
+          echo "Using existing certificates from dev/docker/traefik/certificates"
+        fi
+        exec /entrypoint.sh "$$@"
+    command:
+      - '--log.level=INFO'
+      - '--api.dashboard=true'
+      - '--api.insecure=true'
+      - '--entryPoints.http.address=:80'
+      - '--entryPoints.http.http.redirections.entryPoint.to=https'
+      - '--entryPoints.http.http.redirections.entryPoint.scheme=https'
+      - '--entryPoints.https.address=:443'
+      - '--providers.docker.endpoint=unix:///var/run/docker.sock'
+      - '--providers.docker.exposedByDefault=false'
+      - '--providers.file.directory=/etc/traefik/config'
+      - '--providers.file.watch=true'
+    ports:
+      - '80:80'
+      - '443:443'
+      - '8080:8080'
+    volumes:
+      - '/var/run/docker.sock:/var/run/docker.sock:ro'
+      - './dev/docker/traefik/certificates:/certs'
+      - './dev/docker/traefik/config:/etc/traefik/config:ro'
+    restart: unless-stopped
+
+  opencloud:
+    image: opencloudeu/opencloud-rolling:latest
+    networks:
+      opencloud-net:
+    entrypoint:
+      - /bin/sh
+    command: ['-c', 'opencloud init || true; opencloud server']
+    environment:
+      OC_URL: https://cloud.opencloud.test
+      OC_LOG_LEVEL: info
+      OC_INSECURE: 'true'
+      PROXY_TLS: 'false'
+      PROXY_ENABLE_BASIC_AUTH: 'true'
+      IDM_ADMIN_PASSWORD: 'admin'
+      IDM_CREATE_DEMO_USERS: 'true'
+      GATEWAY_GRPC_ADDR: 0.0.0.0:9142
+      MICRO_REGISTRY_ADDRESS: 127.0.0.1:9233
+      NATS_NATS_HOST: 0.0.0.0
+      NATS_NATS_PORT: 9233
+      WEB_ASSET_APPS_PATH: /web/apps
+      # Development insecure flags
+      PROXY_INSECURE_BACKENDS: true
+      PROXY_OIDC_INSECURE: true
+      FRONTEND_APP_HANDLER_INSECURE: true
+      FRONTEND_ARCHIVER_INSECURE: true
+      GRAPH_EVENTS_TLS_INSECURE: true
+      STORAGE_USERS_EVENTS_TLS_INSECURE: true
+      SEARCH_EVENTS_TLS_INSECURE: true
+      THUMBNAILS_WEBDAV_ALLOW_INSECURE: true
+      THUMBNAILS_CS3_ALLOW_INSECURE: true
+    volumes:
+      - opencloud-config:/etc/opencloud
+      - ./dev/docker/opencloud/files:/var/lib/opencloud
+      - ./dist:/web/apps/skeleton
+    labels:
+      - 'traefik.enable=true'
+      - 'traefik.http.routers.opencloud.entrypoints=https'
+      - 'traefik.http.routers.opencloud.rule=Host(`cloud.opencloud.test`)'
+      - 'traefik.http.routers.opencloud.tls=true'
+      - 'traefik.http.services.opencloud.loadbalancer.server.port=9200'
+    restart: unless-stopped
+    depends_on:
+      - traefik
+
+volumes:
+  opencloud-config:
+
+networks:
+  opencloud-net:

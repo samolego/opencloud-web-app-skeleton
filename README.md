@@ -40,7 +40,7 @@ You should start by rephrasing the app name `skeleton` to your desired app name 
 
 Don't forget to rename the root directory as well.
 
-More details and examples about app/extension development are available in the [developer documentation](https://docs.opencloud.eu/clients/web/extension-system/).
+More details and examples about app/extension development are available in the [developer documentation](https://docs.opencloud.eu/docs/dev/web/extension-system/).
 
 Once you have a working extension, consider making it available via git.
 
